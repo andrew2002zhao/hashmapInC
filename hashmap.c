@@ -161,6 +161,7 @@ int delete (struct HashTable * hashTable, int key) {
     LinkedList * list = hashTable -> array[*hashedKey];
     Node * sentinel = list -> sentinel;
     popNode(sentinel, key);
+    free(hashedKey);
     return 0;
 }
 
@@ -188,6 +189,7 @@ int clearHashTable(HashTable * hashTable, int size) {
         clearLinkedList(linkedList);
         free(linkedList);
     }
+    free(hashTable -> array);
     //clear all linked List
     //clear table
     free(hashTable);
@@ -196,7 +198,7 @@ int clearHashTable(HashTable * hashTable, int size) {
 
 int allocateHashTable(struct HashMap ** obj, int size) {
     struct HashTable * hashTable = malloc(sizeof(HashTable));
-    hashTable -> array = malloc(sizeof(LinkedList *) * 100UL);
+    hashTable -> array = malloc(sizeof(LinkedList *) * size);
     hashTable -> size = size;
 
     
@@ -282,10 +284,7 @@ void* populateHashMapThreaded(void* arg){
             pthread_mutex_unlock(&m);
             break;
         }
-        
-        
     }
-    
 }
 
 
@@ -296,6 +295,7 @@ int fileToHashMap(char * filePath, struct HashTable ** hashTable, int size, int 
     fptr = fopen(filePath, "r");
     if(fptr == NULL) {
         printf("File is not opened. Exiting.");
+        fclose(fptr);
         return -1;
     }
 
@@ -306,17 +306,20 @@ int fileToHashMap(char * filePath, struct HashTable ** hashTable, int size, int 
 
     pthread_t * pthread_array = malloc(thread_size * sizeof(pthread_t));
     pthread_mutex_init(&m, NULL);
-
+    struct populateHashMapThreadedArguments * pHMTA = malloc(sizeof(struct populateHashMapThreadedArguments));
     for(int i = 0; i < thread_size; i++) {
-        struct populateHashMapThreadedArguments * pHMTA = malloc(sizeof(struct populateHashMapThreadedArguments));
+        
         pHMTA -> fptr = fptr;
         pHMTA -> hashTable = hashTable;
         pthread_create(&pthread_array[i], NULL, populateHashMapThreaded, (void *) pHMTA);
+        
     }
 
     for(int i = 0; i < thread_size; i++) {
         pthread_join(pthread_array[i], NULL);
     }
+    free(pHMTA);
+    free(pthread_array);
     pthread_mutex_destroy(&m);
 
     fclose(fptr);
@@ -340,26 +343,30 @@ int main(int argc, char ** argv)
     // int n = 100;
     // hashingFunction(n, p);
 
-    struct HashTable * hashTable = malloc(sizeof(HashTable));
+    struct HashTable ** hashTable = malloc(sizeof(HashTable));
 
-    fileToHashMap("./numbers.txt", &hashTable, 100, 2);
+    fileToHashMap("./numbers.txt", hashTable, 100, 2);
+    
 
-
-    int status = get(hashTable, 1, p);
-
-    printf("%d \n", *p);
-
-    status = get(hashTable, 5, p);
+    int status = get(*hashTable, 1, p);
 
     printf("%d \n", *p);
 
-    status = get(hashTable, 10, p);
+    status = get(*hashTable, 5, p);
 
     printf("%d \n", *p);
 
-    status = get(hashTable, 50, p);
+    status = get(*hashTable, 10, p);
 
     printf("%d \n", *p);
+
+    status = get(*hashTable, 50, p);
+
+    printf("%d \n", *p);
+
+    clearHashTable(*hashTable, 100);
+    free(p);
+    free(hashTable);
 
     // allocateHashTable(&hashTable, 100);
     // // memset(hashTable -> array, 0, HASHTABLE_SIZE);
