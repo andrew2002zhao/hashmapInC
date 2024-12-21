@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 //implement a hashtable
 //collision avoidance
@@ -245,10 +246,51 @@ int resizeHashTable(HashTable * hashTable, HashTable * newHashTable, int oldSize
     return 0;
 }
 
+struct populateHashMapThreadedArguments{
+    FILE * fptr;
+    struct HashTable ** hashTable;
+};
+
+pthread_mutex_t m;
+
+void* populateHashMapThreaded(void* arg){
+    struct populateHashMapThreadedArguments* args = (struct populateHashMapThreadedARguments *) arg;
+    int fileLine[1];
+
+    while(1) {
+        pthread_mutex_lock(&m);
+        if(fscanf(args -> fptr, "%d", fileLine) == 1){
+
+            int value = 0;
+            int * hashValuePtr = malloc(sizeof(int));
+            if(get(*(args -> hashTable), fileLine[0], hashValuePtr) == -1){
+                value = 1;
+            }
+            else{
+                value = *hashValuePtr + 1;
+                delete(*(args -> hashTable), fileLine[0]);
+            }
+            put(*(args -> hashTable), fileLine[0], value);
+
+            pthread_mutex_unlock(&m);
+            
+            free(hashValuePtr);
+            
+
+        }
+        else{
+            pthread_mutex_unlock(&m);
+            break;
+        }
+        
+        
+    }
+    
+}
 
 
 // //take in a file path and a reference to a pointer to return a populated hashmap
-int fileToHashMap(char * filePath, struct HashTable ** hashTable, int size) {
+int fileToHashMap(char * filePath, struct HashTable ** hashTable, int size, int thread_size) {
     //open the file
     FILE* fptr;
     fptr = fopen(filePath, "r");
@@ -259,22 +301,26 @@ int fileToHashMap(char * filePath, struct HashTable ** hashTable, int size) {
 
     //create an empty hash map with the size passed over
     allocateHashTable(hashTable, size);
-    int fileLine[1];
-    while(fscanf(fptr, "%d", fileLine) == 1) {
-        
-        int value = 0;
-        int * hashValuePtr = malloc(sizeof(int));
-        if(get(*hashTable, fileLine[0], hashValuePtr) == -1){
-            value = 1;
-        }
-        else{
-            value = *hashValuePtr + 1;
-            delete(*hashTable, fileLine[0]);
-        }
-        put(*hashTable, fileLine[0], value);
-        free(hashValuePtr);
+
+    //make this portion multithreaded
+
+    pthread_t * pthread_array = malloc(thread_size * sizeof(pthread_t));
+    pthread_mutex_init(&m, NULL);
+
+    for(int i = 0; i < thread_size; i++) {
+        struct populateHashMapThreadedArguments * pHMTA = malloc(sizeof(struct populateHashMapThreadedArguments));
+        pHMTA -> fptr = fptr;
+        pHMTA -> hashTable = hashTable;
+        pthread_create(&pthread_array[i], NULL, populateHashMapThreaded, (void *) pHMTA);
     }
+
+    for(int i = 0; i < thread_size; i++) {
+        pthread_join(pthread_array[i], NULL);
+    }
+    pthread_mutex_destroy(&m);
+
     fclose(fptr);
+    
     return 0;
 }
 
@@ -296,7 +342,7 @@ int main(int argc, char ** argv)
 
     struct HashTable * hashTable = malloc(sizeof(HashTable));
 
-    fileToHashMap("./numbers.txt", &hashTable, 100);
+    fileToHashMap("./numbers.txt", &hashTable, 100, 2);
 
 
     int status = get(hashTable, 1, p);
