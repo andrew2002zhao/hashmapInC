@@ -1,11 +1,3 @@
-/******************************************************************************
-
-Welcome to GDB Online.
-  GDB online is an online compiler and debugger tool for C, C++, Python, PHP, Ruby, 
-  C#, OCaml, VB, Perl, Swift, Prolog, Javascript, Pascal, COBOL, HTML, CSS, JS
-  Code, Compile, Run and Debug online from anywhere in world.
-
-*******************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,14 +10,10 @@ Welcome to GDB Online.
 //hashmap cannot hold negative values or 0
 
 //creation
-#define HASHTABLE_SIZE 100UL
+// #define HASHTABLE_SIZE 100UL
 // helper functions
 
-int hashingFunction(int value, int * hashedValue) {
-    int hashedValueInteger = value % HASHTABLE_SIZE; 
-    *hashedValue = hashedValueInteger;
-    return 0;
-}
+
 
 //standard functionalilty
 
@@ -41,8 +29,16 @@ typedef struct LinkedList {
 
 typedef struct HashTable {
     LinkedList ** array;
+    int size;
 } HashTable;
 
+
+int hashingFunction(struct HashTable * hashTable , int value, int * hashedValue) {
+    int hashTableSize = hashTable -> size;
+    int hashedValueInteger = value % hashTableSize; 
+    *hashedValue = hashedValueInteger;
+    return 0;
+}
 
 
 //add it to the back of a linked list
@@ -86,7 +82,7 @@ int popNode(Node * sentinel, int key) {
             prev -> next = temp -> next;
             temp -> next = NULL;
             
-            free(prev);
+            free(temp);
             return 0;
         }
         prev = temp;
@@ -115,15 +111,15 @@ int put(struct HashTable * hashTable, int key, int value){
     
     //take my key and hash it 
     int * hashedKey = malloc(sizeof(int));
-    printf("hashtable %x \n", hashTable);
+    // printf("hashtable %x \n", hashTable);
     //TODO:IMPLEMENT HASH FUNCTION
-    int status = hashingFunction(key, hashedKey);
+    int status = hashingFunction(hashTable ,key, hashedKey);
     
     //use the hashed key to find where in the hashTable to insert it
     
     LinkedList * list = hashTable -> array[*hashedKey];
     Node * sentinel = list -> sentinel;
-    printf("sentinel %x \n", list -> sentinel);
+
     
     pushOrChangeNode(sentinel, key, value);
     
@@ -138,7 +134,7 @@ int get(struct HashTable * hashTable, int key, int * value) {
     //take my key  and hash it
     int * hashedKey = malloc(sizeof(int));
     //TODO: implement HASH FUNCTION
-    int status = hashingFunction(key, hashedKey);
+    int status = hashingFunction(hashTable, key, hashedKey);
     //use the hashed key to get the sentinel at that location and then find the value with the non hashed key
    
     LinkedList * list = hashTable -> array[*hashedKey];
@@ -160,7 +156,7 @@ int delete (struct HashTable * hashTable, int key) {
     //delete 
     //get the hashed key
     int * hashedKey = malloc(sizeof(int));
-    int status = hashingFunction(key, hashedKey);
+    int status = hashingFunction(hashTable, key, hashedKey);
     LinkedList * list = hashTable -> array[*hashedKey];
     Node * sentinel = list -> sentinel;
     popNode(sentinel, key);
@@ -197,21 +193,31 @@ int clearHashTable(HashTable * hashTable, int size) {
     return 0;
 }
 
-int resizeHashTable(HashTable * hashTable, HashTable * newHashTable, int oldSize, int newSize) {
+int allocateHashTable(struct HashMap ** obj, int size) {
+    struct HashTable * hashTable = malloc(sizeof(HashTable));
+    hashTable -> array = malloc(sizeof(LinkedList *) * 100UL);
+    hashTable -> size = size;
+
     
-    newHashTable -> array = malloc(sizeof(LinkedList *) * newSize);
-    
-    for(int i = 0; i < newSize; i++) {
+    for(int i = 0; i < size; i++) {
         LinkedList * list = malloc(sizeof(LinkedList));
-        newHashTable -> array[i] = list;
+        
+        hashTable -> array[i] = list;
         Node * sentinel = malloc(sizeof(Node));
         list -> sentinel = sentinel;
-       
-        // printf("%x\n", list.sentinel);
+        
+
+
         sentinel -> value = -100000;
         sentinel -> next = NULL;
         sentinel -> key = -100000;
     }
+    *obj = hashTable;
+}
+
+int resizeHashTable(HashTable * hashTable, HashTable * newHashTable, int oldSize, int newSize) {
+    
+    
     
     for(int i = 0; i < oldSize; i++) {
         LinkedList * linkedList = hashTable -> array[i];
@@ -233,10 +239,42 @@ int resizeHashTable(HashTable * hashTable, HashTable * newHashTable, int oldSize
         }
     }
     
+    clearHashTable(hashTable, oldSize);
     
-    // clearHashTable(hashTable, oldSize);
     
-    
+    return 0;
+}
+
+
+
+// //take in a file path and a reference to a pointer to return a populated hashmap
+int fileToHashMap(char * filePath, struct HashTable ** hashTable, int size) {
+    //open the file
+    FILE* fptr;
+    fptr = fopen(filePath, "r");
+    if(fptr == NULL) {
+        printf("File is not opened. Exiting.");
+        return -1;
+    }
+
+    //create an empty hash map with the size passed over
+    allocateHashTable(hashTable, size);
+    int fileLine[1];
+    while(fscanf(fptr, "%d", fileLine) == 1) {
+        
+        int value = 0;
+        int * hashValuePtr = malloc(sizeof(int));
+        if(get(*hashTable, fileLine[0], hashValuePtr) == -1){
+            value = 1;
+        }
+        else{
+            value = *hashValuePtr + 1;
+            delete(*hashTable, fileLine[0]);
+        }
+        put(*hashTable, fileLine[0], value);
+        free(hashValuePtr);
+    }
+    fclose(fptr);
     return 0;
 }
 
@@ -248,63 +286,62 @@ int resizeHashTable(HashTable * hashTable, HashTable * newHashTable, int oldSize
 
 int main(int argc, char ** argv)
 {
-    // printf("Hello World");
-    // int array[3];
-    // printf("%d\n", array[0]);
+
     
     // hashing function non modulus 
      // hashing function modulus
-    // int * p = malloc(sizeof(int));
+    int * p = malloc(sizeof(int));
     // int n = 100;
     // hashingFunction(n, p);
-    // printf("%d", *p);
-    
+
     struct HashTable * hashTable = malloc(sizeof(HashTable));
-    hashTable -> array = malloc(sizeof(LinkedList *) * HASHTABLE_SIZE);
-    
-    for(int i = 0; i < HASHTABLE_SIZE; i++) {
-        LinkedList * list = malloc(sizeof(LinkedList));
-        
-        hashTable -> array[i] = list;
-        Node * sentinel = malloc(sizeof(Node));
-        list -> sentinel = sentinel;
-        
-        printf("sentinel %d  address %x\n", i, sentinel);
-       
-        // printf("%x\n", list.sentinel);
-        sentinel -> value = -100000;
-        sentinel -> next = NULL;
-        sentinel -> key = -100000;
-    }
-    // memset(hashTable -> array, 0, HASHTABLE_SIZE);
-    
-    int * p = malloc(sizeof(int));
-    //get an empty value returns -1 
-    //put into an empty spot 
-    //get from a non empty spot returns the value stored
+
+    fileToHashMap("./numbers.txt", &hashTable, 100);
+
+
+    int status = get(hashTable, 1, p);
+
+    printf("%d \n", *p);
+
+    status = get(hashTable, 5, p);
+
+    printf("%d \n", *p);
+
+    status = get(hashTable, 10, p);
+
+    printf("%d \n", *p);
+
+    status = get(hashTable, 50, p);
+
+    printf("%d \n", *p);
+
+    // allocateHashTable(&hashTable, 100);
+    // // memset(hashTable -> array, 0, HASHTABLE_SIZE);
+    // // struct HashTable * newHashTable = malloc(sizeof(HashTable));
+
+    // int * p = malloc(sizeof(int));
+    // //get an empty value returns -1 
+    // //put into an empty spot 
+    // //get from a non empty spot returns the value stored
    
-    //put into a valid spot
-    int status = put(hashTable, 0, 1);
-    status = put(hashTable, 0, 20);
+    // //put into a valid spot
+    // int status = put(hashTable, 0, 1);
+    // status = put(hashTable, 0, 20);
    
-    status = get(hashTable, 0, p);
+    // status = get(hashTable, 0, p);
     
-    status = delete(hashTable, 0);
-    status = get(hashTable, 0, p);
-    LinkedList * linkedList = hashTable -> array[0];
-    Node * sentinel = linkedList -> sentinel;
+    // status = delete(hashTable, 0);
+    // status = get(hashTable, 0, p);
+    // LinkedList * linkedList = hashTable -> array[0];
+    // Node * sentinel = linkedList -> sentinel;
     
-    HashTable * newHashTable = malloc(sizeof(HashTable));
-    HashTable * newHashTable2 = malloc(sizeof(HashTable));
-    HashTable * newHashTable3 = malloc(sizeof(HashTable));
-    printf("old hashTable %x \n", hashTable);
-    printf("old sentinel %x \n", sentinel);
-    printf("old Linked List %x \n", linkedList);
-    printf("hashTable %x %x %x\n", newHashTable, newHashTable2, newHashTable3);
-    resizeHashTable(hashTable, newHashTable, 100, 200);
+    // struct HashTable * newHashTable = malloc(sizeof(HashTable));
+
+    // allocateHashTable(&newHashTable, 200);
+
+    // resizeHashTable(hashTable, newHashTable, 100, 200);
    
-    
-    status = put(newHashTable, 199, 23);
+    // status = put(newHashTable, 199, 23);
 
     return 0;
 }
